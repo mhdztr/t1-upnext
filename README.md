@@ -1,37 +1,52 @@
-# UpNext Backend — Dockerized Event & Organization Management API
+# UpNext Backend — Containerized Event & Organization Management API
 
-> **Tugas 1 - Study Club Backend Intermediate**  
-> **Kabinet Genesis | KSM Veterantech UPNVJ 2026**
-
----
-
-## 📌 Deskripsi Proyek
-
-**UpNext Backend** adalah layanan RESTful API berbasis Node.js dan PostgreSQL untuk platform manajemen dan publikasi kegiatan organisasi kemahasiswaan (BEM, HIMA, UKM). Sistem ini menangani autentikasi organisasi, manajemen data profil, publikasi event, pengunggahan banner/dokumen, serta pencarian event kampus.
-
-Pada repositori ini, aplikasi telah dikontainerisasi menggunakan **Dockerfile** dan **Docker Compose** agar backend dan database PostgreSQL dapat dijalankan secara terisolasi, terintegrasi melalui jaringan container, serta memiliki **persistensi data** melalui Docker Named Volume.
+**Tugas 1 — Study Club Backend Intermediate**  
+Kabinet Genesis | KSM Veterantech UPNVJ 2026  
+Repository: [mhdztr/t1-upnext](https://github.com/mhdztr/t1-upnext)
 
 ---
 
-## 🏗️ Arsitektur & Teknologi
+## 1. Overview
 
-* **Runtime & Framework**: Node.js (v20 LTS), Express.js (v5)
-* **Database & ORM**: PostgreSQL 16, Prisma ORM
-* **Authentication**: JSON Web Token (JWT) & Bcrypt
-* **Containerization**: Docker & Docker Compose
-* **Data Persistence**: Docker Named Volume (`postgres_data`)
+**UpNext Backend** is a RESTful API service built with Node.js and PostgreSQL designed for managing and publishing campus student organization events (BEM, HIMA, SENAT, UKM). The platform handles organization authentication, profile management, event publishing, media and document uploads, and campus event exploration.
+
+This repository implements full multi-container orchestration using **Docker** and **Docker Compose**, isolating the Express API and PostgreSQL database inside a dedicated bridge network while guaranteeing **data persistence** across container lifecycles via Docker Named Volumes.
 
 ---
 
-## 📋 Prasyarat Sistem (Prerequisites)
+## 2. Architecture & Technology Stack
 
-Sebelum menjalankan aplikasi, pastikan sistem Anda telah terpasang:
-* **Docker Engine** (versi 24.0.0 atau lebih baru)
-* **Docker Compose** (versi 2.20.0 atau lebih baru)
+| Component | Technology | Description |
+| :--- | :--- | :--- |
+| **Runtime** | Node.js 20 LTS (Alpine) | Minimalist and lightweight containerized runtime |
+| **Framework** | Express.js 5.1.0 | Core HTTP routing and controller logic |
+| **Database** | PostgreSQL 16 (Alpine) | Relational database engine |
+| **ORM** | Prisma 6.7.0 | Schema modeling, query building, and runtime migrations |
+| **Authentication** | JWT & Bcrypt.js | Stateless token-based auth and secure password hashing |
+| **Media Storage** | Multer & Cloudinary SDK | Memory storage buffer and streaming media upload |
+| **Timezone** | Day.js | Standardized to Western Indonesia Time (`Asia/Jakarta` / WIB) |
+| **Orchestration** | Docker & Docker Compose | Multi-service networking, healthchecks, and named volumes |
+
+### Service & Port Mapping
+
+| Service Name | Container Name | Internal Port | Host Port | Network |
+| :--- | :--- | :--- | :--- | :--- |
+| `backend` | `upnext_backend` | `5000` | `5000:5000` | `upnext_network` (bridge) |
+| `db` | `upnext_db` | `5432` | `5432:5432` | `upnext_network` (bridge) |
+
+---
+
+## 3. Prerequisites
+
+Ensure your host machine has the following tools installed:
+
+* **Docker Engine** (v24.0.0 or higher)
+* **Docker Compose** (v2.20.0 or higher / Compose v2)
 * **Git**
-* *(Opsional)* **cURL** atau **Postman** untuk pengujian endpoint API
+* **cURL** (or any HTTP client like Postman / Bruno)
 
-Verifikasi instalasi dengan perintah:
+Verify your local installation:
+
 ```bash
 docker --version
 docker compose version
@@ -39,124 +54,185 @@ docker compose version
 
 ---
 
-## ⚙️ Setup Lingkungan (Environment Setup)
+## 4. Environment Configuration
 
-1. Clone repositori ini:
-   ```bash
-   git clone <URL_REPOSITORY_ANDA>
-   cd upnext-backend
-   ```
+The application loads environment variables during startup. A `.env.example` template is provided with pre-configured defaults for local Docker environments.
 
-2. Buat berkas environment dari template `.env.example`:
+1. Create a `.env` file from the example template:
    ```bash
    cp .env.example .env
    ```
 
-3. Sesuaikan isi `.env` jika diperlukan. Secara default untuk lingkungan Docker Compose:
+2. Default Docker Compose configuration:
    ```env
    PORT=5000
+   POSTGRES_USER=postgres
+   POSTGRES_PASSWORD=postgres_password
+   POSTGRES_DB=upnext_db
    DATABASE_URL="postgresql://postgres:postgres_password@db:5432/upnext_db?schema=public"
    JWT_SECRET="upnext_jwt_secret_key_demo"
    SUPERUSER_SECRET="upnext_superuser_key_demo"
+   FRONTEND_ORIGIN="http://localhost:5173"
    ```
+
+> [!NOTE]
+> The `docker-compose.yml` file includes fallback defaults for all required database parameters, allowing the stack to run immediately out-of-the-box even without a `.env` file.
 
 ---
 
-## 🚀 Perintah Build & Menjalankan Aplikasi
+## 5. Build & Deployment
 
-Jalankan seluruh service (Backend API + Database PostgreSQL) di latar belakang menggunakan perintah:
+### Step 1: Build Image and Start Services
+
+Build the backend container image from the `Dockerfile` and start all services in detached mode:
 
 ```bash
 docker compose up --build -d
 ```
 
-### Memeriksa Status Container
-Pastikan kedua container (`backend` dan `db`) berjalan dengan baik:
+### Step 2: Verify Container Health
+
+Confirm both services are running and healthy:
+
 ```bash
 docker compose ps
 ```
 
-### Melihat Log Aplikasi
-Untuk memverifikasi sinkronisasi skema Prisma dan server yang telah menyala:
+Expected output:
+* `upnext_db`: Status `Up (healthy)` on port `0.0.0.0:5432->5432/tcp`
+* `upnext_backend`: Status `Up` on port `0.0.0.0:5000->5000/tcp`
+
+### Step 3: Inspect Application Logs
+
+Verify database synchronization (`npx prisma db push`) and server initialization:
+
 ```bash
 docker compose logs -f backend
 ```
 
 ---
 
-## 🧪 Contoh Pengujian Endpoint API
+## 6. API Verification & Testing
 
-### 1. Pengujian Tulis Data (Write - Sign In / Public Endpoints)
-Kalian dapat menguji endpoint publik atau membuat data organisasi baru:
+### Endpoint Reference Matrix
 
-**Mendaftarkan Organisasi Baru (Form-Data):**
+| Test Case | Method | Endpoint | Payload Type | Description |
+| :--- | :---: | :--- | :--- | :--- |
+| **Read Data** | `GET` | `/organizations` | None | Fetch all registered student organizations |
+| **Read Data** | `GET` | `/events` | None | Fetch all published campus events |
+| **Write Data** | `POST` | `/auth/signup` | `multipart/form-data` | Register a new organization with membership proof |
+| **Authentication** | `POST` | `/auth/signin` | `application/json` | Authenticate organization and receive JWT token |
+
+### 1. Read Test (Querying Existing Records)
+
+Retrieve all registered organizations:
 ```bash
-curl -X POST http://localhost:5000/auth/signup \
-  -F "name=HIMA Informatika" \
-  -F "email=hima@upnvj.ac.id" \
-  -F "password=secretpassword" \
-  -F "membershipProof=@./dummy-proof.png"
+curl -s http://localhost:5000/organizations
 ```
 
-*(Catatan: Anda juga bisa menggunakan endpoint sign-in atau seeder untuk membuat data awal).*
-
-### 2. Pengujian Baca Data (Read - Mengambil Daftar Organisasi / Event)
-Mengambil daftar seluruh organisasi yang terdaftar di database:
+Retrieve all campus events:
 ```bash
-curl -X GET http://localhost:5000/organizations
+curl -s http://localhost:5000/events
 ```
 
-Mengambil daftar seluruh event kampus:
+### 2. Write Test (Registering a New Record)
+
+Register a new organization with a valid image attachment:
+
 ```bash
-curl -X GET http://localhost:5000/events
+# Generate a 1-pixel sample proof image
+echo "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==" | base64 -d > /tmp/sample-proof.png
+
+# Send registration request
+curl -s -X POST http://localhost:5000/auth/signup \
+  -F "name=HIMA Informatika UPNVJ" \
+  -F "email=hima.informatika@upnvj.ac.id" \
+  -F "password=password123" \
+  -F "membershipProof=@/tmp/sample-proof.png"
+```
+
+Verify that the new record is committed to PostgreSQL:
+```bash
+curl -s http://localhost:5000/organizations | grep "HIMA Informatika UPNVJ"
 ```
 
 ---
 
-## 💾 Pengujian Persistensi Data (Data Persistence Test)
+## 7. Data Persistence Verification (Named Volume)
 
-Pengujian ini membuktikan bahwa data di dalam database PostgreSQL **tidak hilang** saat container dimatikan dan dibuat ulang, berkat volume `postgres_data`.
+This test proves that database state is persisted inside the Docker Named Volume (`postgres_data`) and survives container destruction and recreation.
 
-1. **Simpan data baru** ke dalam API menggunakan salah satu endpoint tulis di atas.
-2. **Ambil data** untuk memastikan data tersebut sudah tersimpan di database:
-   ```bash
-   curl -X GET http://localhost:5000/organizations
-   ```
-3. **Matikan dan hapus container** *(PENTING: Jangan gunakan flag `-v` agar volume tetap aman)*:
+1. **Verify data has been written** using the Write Test above.
+2. **Stop and remove all containers** without removing volumes:
    ```bash
    docker compose down
    ```
-4. **Nyalakan kembali container**:
+   > [!IMPORTANT]
+   > Do **NOT** pass the `-v` or `--volumes` flag during this step to ensure the named volume is preserved on the host.
+
+3. **Verify the named volume exists on host**:
+   ```bash
+   docker volume ls | grep postgres_data
+   ```
+
+4. **Recreate and start the containers**:
    ```bash
    docker compose up -d
    ```
-5. **Ambil kembali data melalui API**:
+
+5. **Query the API again**:
    ```bash
-   curl -X GET http://localhost:5000/organizations
+   curl -s http://localhost:5000/organizations | grep "HIMA Informatika UPNVJ"
    ```
-   **Hasil**: Data yang dibuat pada langkah 1 tetap tampil dan utuh. Ini membuktikan konfigurasi Docker Volume bekerja sesuai ketentuan.
+
+**Result**: The record created in Step 1 remains intact, confirming that the named volume is correctly configured and database persistence is operational.
 
 ---
 
-## 🛑 Menghentikan Aplikasi
+## 8. Container Management Reference
 
-Untuk menghentikan service:
-```bash
-docker compose down
-```
+| Action | Command | Purpose |
+| :--- | :--- | :--- |
+| **Start Stack** | `docker compose up -d` | Start services in background |
+| **Build & Start** | `docker compose up --build -d` | Rebuild image from Dockerfile and start |
+| **Stop Services** | `docker compose stop` | Pause containers without removing them |
+| **Tear Down** | `docker compose down` | Remove containers and network, **preserves data** |
+| **Reset Stack** | `docker compose down -v` | Remove containers, network, and **wipe all data** |
+| **Tail Logs** | `docker compose logs -f` | Stream live combined service logs |
+| **Database CLI** | `docker compose exec db psql -U postgres -d upnext_db` | Open interactive PostgreSQL shell |
 
-Untuk menghentikan service sekaligus **menghapus volume database** (reset data):
-```bash
-docker compose down -v
+---
+
+## 9. Project Directory Structure
+
+```text
+upnext-backend/
+├── api/
+│   └── app.js                  # Express.js entry point, middleware, and route mounting
+├── controllers/                # Business logic handlers (auth, event, organization)
+├── middlewares/                # Auth verification, Joi schema validation, Multer storage
+├── prisma/
+│   ├── schema.prisma           # Prisma schema definition and PostgreSQL mapping
+│   └── seed.js                 # Demo data seeder script
+├── routes/                     # Express RESTful route definitions
+├── utils/                      # Utilities (Cloudinary upload, response formatter, timezone)
+├── .dockerignore               # Build context exclusions
+├── .env.example                # Environment variables template
+├── Dockerfile                  # Production container definition (Node.js 20 Alpine)
+├── docker-compose.yml          # Multi-container orchestration (Backend + PostgreSQL 16)
+├── docker-entrypoint.sh        # Startup script for automated Prisma push and app boot
+└── README.md                   # Technical project documentation
 ```
 
 ---
 
-## 🤖 Atribusi Alat Bantu & Referensi
+## 10. Attribution & References
 
-Sesuai dengan ketentuan tugas (Poin 5.C):
-* **AI Assistance**: Anthropic Claude & Google DeepMind Antigravity AI digunakan untuk membantu perancangan struktur `Dockerfile`, konfigurasi `docker-compose.yml`, penyusunan skenario pengujian, serta pembuatan dokumentasi ini.
-* **Referensi Resmi**:
-  * [Docker Official Documentation](https://docs.docker.com/)
-  * [Prisma Database in Docker Guide](https://www.prisma.io/docs/guides/deployment/deployment-guides/deploying-to-docker)
-  * [PostgreSQL Docker Official Image](https://hub.docker.com/_/postgres)
+In compliance with academic integrity and assignment guidelines:
+
+* **AI Assistance**:
+  * Claude & Google DeepMind Antigravity AI were utilized for containerization architecture design (`Dockerfile`, `docker-compose.yml`), entrypoint lifecycle scripting, testing procedure design, and documentation authoring.
+* **Official Documentation**:
+  * [Docker Documentation](https://docs.docker.com/) — Containerization and Compose specifications.
+  * [Prisma Deployment Guide](https://www.prisma.io/docs/guides/deployment/deployment-guides/deploying-to-docker) — Alpine Linux binary engine dependencies.
+  * [PostgreSQL Docker Image](https://hub.docker.com/_/postgres) — Environment variables and healthcheck patterns.

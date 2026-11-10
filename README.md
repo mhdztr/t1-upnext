@@ -29,17 +29,17 @@ Proyek ini merupakan kelanjutan dari repositori Tugas 1 UpNext Backend. Pada tah
 
 ### Langkah Menjalankan
 
-1. Salin template variabel lingkungan:
+1. Copy template variabel lingkungan:
    ```bash
    cp .env.example .env
    ```
 
-2. Jalankan seluruh stack kontainer di latar belakang (*detached mode*):
+2. Run seluruh stack kontainer di latar belakang (*detached mode*):
    ```bash
    docker compose up --build -d
    ```
 
-3. Periksa status kontainer:
+3. Check status kontainer:
    ```bash
    docker compose ps
    ```
@@ -174,7 +174,7 @@ docker compose down -v
 ## 7. Atribusi Alat Bantu & Referensi
 
 * **AI Assistance**: Claude & Google DeepMind Antigravity AI digunakan untuk perancangan arsitektur ingress Nginx, konfigurasi Compose multi-replica, implementasi rate limiting HTTP 429, dan penyusunan dokumentasi teknis.
-* **Referensi Resmi**:
+* **Referensi**:
   * [Nginx Reverse Proxy Documentation](https://nginx.org/en/docs/http/ngx_http_proxy_module.html)
   * [Nginx Upstream Shared Memory Zone](https://nginx.org/en/docs/http/ngx_http_upstream_module.html#zone)
   * [Nginx Rate Limiting Module](https://nginx.org/en/docs/http/ngx_http_limit_req_module.html)

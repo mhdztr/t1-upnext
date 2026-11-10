@@ -20,9 +20,9 @@ app.use(cors({
 
 app.use(express.json());
 
-app.use('/auth', authRoutes);
-app.use('/events', eventRoutes);
-app.use('/organizations', organizationRoutes);
+app.use(['/auth', '/api/auth'], authRoutes);
+app.use(['/events', '/api/events'], eventRoutes);
+app.use(['/organizations', '/api/organizations'], organizationRoutes);
 
 
 

@@ -1,6 +1,6 @@
-# UpNext Backend — Containerized Event & Organization Management API
+# UpNext Backend — Nginx Gateway, Load Balancing & Traffic Security
 
-**Tugas 1 — Study Club Backend Intermediate**  
+**Tugas 2 — Study Club Backend Intermediate**  
 Kabinet Genesis | KSM Veterantech UPNVJ 2026  
 Repository: [mhdztr/t1-upnext](https://github.com/mhdztr/t1-upnext)
 
@@ -8,231 +8,174 @@ Repository: [mhdztr/t1-upnext](https://github.com/mhdztr/t1-upnext)
 
 ## 1. Overview
 
-**UpNext Backend** is a RESTful API service built with Node.js and PostgreSQL designed for managing and publishing campus student organization events (BEM, HIMA, SENAT, UKM). The platform handles organization authentication, profile management, event publishing, media and document uploads, and campus event exploration.
+Proyek ini merupakan kelanjutan dari repositori Tugas 1 UpNext Backend. Pada tahap ini, arsitektur sistem ditingkatkan dengan menerapkan Nginx sebagai satu-satunya pintu gerbang masuk (*Single Ingress Gateway* / *Reverse Proxy*), penyeimbang beban (*Load Balancer*) untuk 3 replika backend Express.js, pembatasan laju permintaan (*Rate Limiting*), serta penerapan header keamanan dan kompresi Gzip.
 
-This repository implements full multi-container orchestration using **Docker** and **Docker Compose**, isolating the Express API and PostgreSQL database inside a dedicated bridge network while guaranteeing **data persistence** across container lifecycles via Docker Named Volumes.
+### Arsitektur Multi-Container
 
----
-
-## 2. Architecture & Technology Stack
-
-| Component | Technology | Description |
-| :--- | :--- | :--- |
-| **Runtime** | Node.js 20 LTS (Alpine) | Minimalist and lightweight containerized runtime |
-| **Framework** | Express.js 5.1.0 | Core HTTP routing and controller logic |
-| **Database** | PostgreSQL 16 (Alpine) | Relational database engine |
-| **ORM** | Prisma 6.7.0 | Schema modeling, query building, and runtime migrations |
-| **Authentication** | JWT & Bcrypt.js | Stateless token-based auth and secure password hashing |
-| **Media Storage** | Multer & Cloudinary SDK | Memory storage buffer and streaming media upload |
-| **Timezone** | Day.js | Standardized to Western Indonesia Time (`Asia/Jakarta` / WIB) |
-| **Orchestration** | Docker & Docker Compose | Multi-service networking, healthchecks, and named volumes |
-
-### Service & Port Mapping
-
-| Service Name | Container Name | Internal Port | Host Port | Network |
-| :--- | :--- | :--- | :--- | :--- |
-| `backend` | `upnext_backend` | `5000` | `5000:5000` | `upnext_network` (bridge) |
-| `db` | `upnext_db` | `5432` | `5432:5432` | `upnext_network` (bridge) |
+* **Satu Pintu Masuk (Single Ingress)**: Service Nginx adalah satu-satunya service yang memublikasikan port ke host (`80:80`). Service backend dan database PostgreSQL tidak mengekspos port ke host (`no ports`), melainkan berkomunikasi di dalam bridge network internal terisolasi (`upnext_network`).
+* **Reverse Proxy**: Nginx memetakan prefix `/api/` ke cluster backend, meneruskan header `Host` dan `X-Forwarded-For`.
+* **Load Balancing**: Backend berjalan dengan 3 replika kontainer (`deploy.replicas: 3`), dikonfigurasikan dengan upstream shared memory `zone`, dan menyematkan header respons `X-Upstream: $upstream_addr`.
+* **Rate Limiting**: Dibatasi menggunakan modul Nginx `limit_req` dengan status penolakan `429 Too Many Requests`.
+* **Security & Compression**: Header proteksi `X-Content-Type-Options: nosniff` dan kompresi `gzip on` aktif untuk payload `application/json`.
 
 ---
 
-## 3. Prerequisites
+## 2. Cara Menjalankan
 
-Ensure your host machine has the following tools installed:
+### Prasyarat
+* Docker Engine (minimal versi 24.0.0)
+* Docker Compose (minimal versi 2.20.0 / Compose v2)
+* Git & cURL
 
-* **Docker Engine** (v24.0.0 or higher)
-* **Docker Compose** (v2.20.0 or higher / Compose v2)
-* **Git**
-* **cURL** (or any HTTP client like Postman / Bruno)
+### Langkah Menjalankan
 
-Verify your local installation:
-
-```bash
-docker --version
-docker compose version
-```
-
----
-
-## 4. Environment Configuration
-
-The application loads environment variables during startup. A `.env.example` template is provided with pre-configured defaults for local Docker environments.
-
-1. Create a `.env` file from the example template:
+1. Salin template variabel lingkungan:
    ```bash
    cp .env.example .env
    ```
 
-2. Default Docker Compose configuration:
-   ```env
-   PORT=5000
-   POSTGRES_USER=postgres
-   POSTGRES_PASSWORD=postgres_password
-   POSTGRES_DB=upnext_db
-   DATABASE_URL="postgresql://postgres:postgres_password@db:5432/upnext_db?schema=public"
-   JWT_SECRET="upnext_jwt_secret_key_demo"
-   SUPERUSER_SECRET="upnext_superuser_key_demo"
-   FRONTEND_ORIGIN="http://localhost:5173"
-   ```
-
-> [!NOTE]
-> The `docker-compose.yml` file includes fallback defaults for all required database parameters, allowing the stack to run immediately out-of-the-box even without a `.env` file.
-
----
-
-## 5. Build & Deployment
-
-### Step 1: Build Image and Start Services
-
-Build the backend container image from the `Dockerfile` and start all services in detached mode:
-
-```bash
-docker compose up --build -d
-```
-
-### Step 2: Verify Container Health
-
-Confirm both services are running and healthy:
-
-```bash
-docker compose ps
-```
-
-Expected output:
-* `upnext_db`: Status `Up (healthy)` on port `0.0.0.0:5432->5432/tcp`
-* `upnext_backend`: Status `Up` on port `0.0.0.0:5000->5000/tcp`
-
-### Step 3: Inspect Application Logs
-
-Verify database synchronization (`npx prisma db push`) and server initialization:
-
-```bash
-docker compose logs -f backend
-```
-
----
-
-## 6. API Verification & Testing
-
-### Endpoint Reference Matrix
-
-| Test Case | Method | Endpoint | Payload Type | Description |
-| :--- | :---: | :--- | :--- | :--- |
-| **Read Data** | `GET` | `/organizations` | None | Fetch all registered student organizations |
-| **Read Data** | `GET` | `/events` | None | Fetch all published campus events |
-| **Write Data** | `POST` | `/auth/signup` | `multipart/form-data` | Register a new organization with membership proof |
-| **Authentication** | `POST` | `/auth/signin` | `application/json` | Authenticate organization and receive JWT token |
-
-### 1. Read Test (Querying Existing Records)
-
-Retrieve all registered organizations:
-```bash
-curl -s http://localhost:5000/organizations
-```
-
-Retrieve all campus events:
-```bash
-curl -s http://localhost:5000/events
-```
-
-### 2. Write Test (Registering a New Record)
-
-Register a new organization with a valid image attachment:
-
-```bash
-# Generate a 1-pixel sample proof image
-echo "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==" | base64 -d > /tmp/sample-proof.png
-
-# Send registration request
-curl -s -X POST http://localhost:5000/auth/signup \
-  -F "name=HIMA Informatika UPNVJ" \
-  -F "email=hima.informatika@upnvj.ac.id" \
-  -F "password=password123" \
-  -F "membershipProof=@/tmp/sample-proof.png"
-```
-
-Verify that the new record is committed to PostgreSQL:
-```bash
-curl -s http://localhost:5000/organizations | grep "HIMA Informatika UPNVJ"
-```
-
----
-
-## 7. Data Persistence Verification (Named Volume)
-
-This test proves that database state is persisted inside the Docker Named Volume (`postgres_data`) and survives container destruction and recreation.
-
-1. **Verify data has been written** using the Write Test above.
-2. **Stop and remove all containers** without removing volumes:
+2. Jalankan seluruh stack kontainer di latar belakang (*detached mode*):
    ```bash
-   docker compose down
+   docker compose up --build -d
    ```
-   > [!IMPORTANT]
-   > Do **NOT** pass the `-v` or `--volumes` flag during this step to ensure the named volume is preserved on the host.
 
-3. **Verify the named volume exists on host**:
+3. Periksa status kontainer:
    ```bash
-   docker volume ls | grep postgres_data
+   docker compose ps
    ```
 
-4. **Recreate and start the containers**:
-   ```bash
-   docker compose up -d
-   ```
-
-5. **Query the API again**:
-   ```bash
-   curl -s http://localhost:5000/organizations | grep "HIMA Informatika UPNVJ"
-   ```
-
-**Result**: The record created in Step 1 remains intact, confirming that the named volume is correctly configured and database persistence is operational.
+   Seluruh kontainer (1 Nginx, 3 Backend Replicas, dan 1 PostgreSQL) harus berstatus aktif (*Up*). Hanya Nginx yang memiliki port mapping `0.0.0.0:80->80/tcp`.
 
 ---
 
-## 8. Container Management Reference
+## 3. Bukti Pengujian cURL
 
-| Action | Command | Purpose |
-| :--- | :--- | :--- |
-| **Start Stack** | `docker compose up -d` | Start services in background |
-| **Build & Start** | `docker compose up --build -d` | Rebuild image from Dockerfile and start |
-| **Stop Services** | `docker compose stop` | Pause containers without removing them |
-| **Tear Down** | `docker compose down` | Remove containers and network, **preserves data** |
-| **Reset Stack** | `docker compose down -v` | Remove containers, network, and **wipe all data** |
-| **Tail Logs** | `docker compose logs -f` | Stream live combined service logs |
-| **Database CLI** | `docker compose exec db psql -U postgres -d upnext_db` | Open interactive PostgreSQL shell |
+Berikut adalah bukti pengujian fungsionalitas yang diambil langsung dari terminal (output teks asli):
 
----
+### A. Port Backend Lama Tidak Bisa Diakses (Host Isolation)
 
-## 9. Project Directory Structure
+Service backend (port 5000) dan PostgreSQL (port 5432) tidak lagi diekspos ke host network. Akses langsung dari host machine ditolak:
 
 ```text
-upnext-backend/
-├── api/
-│   └── app.js                  # Express.js entry point, middleware, and route mounting
-├── controllers/                # Business logic handlers (auth, event, organization)
-├── middlewares/                # Auth verification, Joi schema validation, Multer storage
-├── prisma/
-│   ├── schema.prisma           # Prisma schema definition and PostgreSQL mapping
-│   └── seed.js                 # Demo data seeder script
-├── routes/                     # Express RESTful route definitions
-├── utils/                      # Utilities (Cloudinary upload, response formatter, timezone)
-├── .dockerignore               # Build context exclusions
-├── .env.example                # Environment variables template
-├── Dockerfile                  # Production container definition (Node.js 20 Alpine)
-├── docker-compose.yml          # Multi-container orchestration (Backend + PostgreSQL 16)
-├── docker-entrypoint.sh        # Startup script for automated Prisma push and app boot
-└── README.md                   # Technical project documentation
+$ curl -i http://localhost:5000
+curl: (7) Failed to connect to localhost:5000 after 0 ms: Could not connect to server
+
+$ curl -i http://localhost:5432
+curl: (7) Failed to connect to localhost:5432 after 0 ms: Could not connect to server
+```
+
+### B. Load Balancing (X-Upstream Berganti Antar-Replika)
+
+Permintaan berulang ke endpoint `/api/organizations` diteruskan bergantian secara *round-robin* ke ketiga replika backend, dibuktikan oleh perubahan IP internal pada header respons `X-Upstream`:
+
+```text
+$ for i in {1..6}; do curl -s -D - http://localhost/api/organizations -o /dev/null | grep -E "HTTP/|X-Upstream"; sleep 0.2; done
+HTTP/1.1 200 OK
+X-Upstream: 172.20.0.5:5000
+HTTP/1.1 200 OK
+X-Upstream: 172.20.0.4:5000
+HTTP/1.1 200 OK
+X-Upstream: 172.20.0.3:5000
+HTTP/1.1 200 OK
+X-Upstream: 172.20.0.5:5000
+HTTP/1.1 200 OK
+X-Upstream: 172.20.0.4:5000
+HTTP/1.1 200 OK
+X-Upstream: 172.20.0.3:5000
+```
+
+### C. Rate Limiting (Penolakan dengan Kode Status HTTP 429)
+
+Ketika frekuensi request melebihi batas yang ditentukan pada Nginx (`rate=5r/s burst=2 nodelay`), Nginx secara otomatis menolak request berikutnya dengan status `429 Too Many Requests`:
+
+```text
+$ for i in {1..8}; do curl -s -D - http://localhost/api/organizations -o /dev/null | grep "HTTP/"; done
+HTTP/1.1 200 OK
+HTTP/1.1 200 OK
+HTTP/1.1 200 OK
+HTTP/1.1 429 Too Many Requests
+HTTP/1.1 429 Too Many Requests
+HTTP/1.1 429 Too Many Requests
+HTTP/1.1 429 Too Many Requests
+HTTP/1.1 429 Too Many Requests
+```
+
+### D. Header Keamanan dan Kompresi Gzip
+
+Pengujian request dengan header `Accept-Encoding: gzip` membuktikan Nginx menyematkan header keamanan `X-Content-Type-Options: nosniff` dan mengompresi response JSON menjadi `Content-Encoding: gzip`:
+
+```text
+$ curl -I -H "Accept-Encoding: gzip" http://localhost/api/organizations
+HTTP/1.1 200 OK
+Server: nginx/1.31.8
+Date: Tue, 10 Nov 2026 00:50:34 GMT
+Content-Type: application/json; charset=utf-8
+Connection: keep-alive
+Vary: Accept-Encoding
+X-Powered-By: Express
+Access-Control-Allow-Origin: https://upnext-eta.vercel.app
+Vary: Origin
+Access-Control-Allow-Credentials: true
+ETag: W/"c19-N1Qv+DcLKYQL1TSuaJ5GzGRtR1o"
+X-Upstream: 172.20.0.5:5000
+X-Content-Type-Options: nosniff
+Content-Encoding: gzip
 ```
 
 ---
 
-## 10. Attribution & References
+## 4. Jawaban Pertanyaan Konseptual
 
-In compliance with academic integrity and assignment guidelines:
+### (a) Kenapa upstream perlu zone? Apa yang terjadi kalau dihapus?
+Direktif `zone` berfungsi mengalokasikan area memori bersama (*shared memory zone*) yang dapat diakses oleh seluruh *worker process* Nginx untuk menyinkronkan status upstream, konfigurasi peer, dan status penyeimbangan beban (*load balancing state*). Jika direktif `zone` dihapus, setiap *worker process* akan menyimpan salinan daftar server upstream di memori lokalnya masing-masing secara terisolasi. Akibatnya, penghitung rotasi request tidak tersinkronisasi antar-worker, sehingga distribusi beban trafik tidak berjalan secara merata dan konsisten.
 
-* **AI Assistance**:
-  * Claude & Google DeepMind Antigravity AI were utilized for containerization architecture design (`Dockerfile`, `docker-compose.yml`), entrypoint lifecycle scripting, testing procedure design, and documentation authoring.
-* **Official Documentation**:
-  * [Docker Documentation](https://docs.docker.com/) — Containerization and Compose specifications.
-  * [Prisma Deployment Guide](https://www.prisma.io/docs/guides/deployment/deployment-guides/deploying-to-docker) — Alpine Linux binary engine dependencies.
-  * [PostgreSQL Docker Image](https://hub.docker.com/_/postgres) — Environment variables and healthcheck patterns.
+### (b) Kenapa limit_req_status diganti ke 429? Apa bedanya dengan bawaan nginx?
+Secara bawaan (*default*), Nginx mengembalikan kode status HTTP 503 (*Service Temporarily Unavailable*) ketika batas frekuensi request terlampaui. Kode 503 mengindikasikan adanya gangguan atau kelebihan beban di sisi server, sedangkan rate limiting merupakan pembatasan akibat kuota permintaan klien yang telah habis. Mengganti `limit_req_status` ke 429 (*Too Many Requests*) mematuhi standar RFC 6585, secara semantik menyatakan kepada klien bahwa laju request melebihi batas yang diizinkan, dan memudahkan penanganan error pada sisi frontend/klien.
+
+### (c) Kenapa backend dan database tidak punya ports, dan nginx menjangkau backend lewat apa?
+Blok `ports` ditiadakan pada service backend dan database untuk menerapkan prinsip keamanan *defense in depth* dan *least privilege*, mencegah kontainer terekspos langsung ke host network, serta menjadikan Nginx sebagai satu-satunya gerbang masuk (*single point of entry / ingress*). Nginx tetap dapat menjangkau service backend karena keduanya berada di dalam Docker bridge network internal yang sama (`upnext_network`), di mana Nginx berkomunikasi langsung ke backend melalui DNS resolver internal Docker menggunakan nama service (`http://backend:5000`).
+
+---
+
+## 5. Pemetaan Service dan Konfigurasi
+
+| Service Name | Port Internal | Port Host | Skala Replika | Keterangan |
+| :--- | :--- | :--- | :---: | :--- |
+| `nginx` | `80` | `80:80` | 1 | Reverse Proxy, Rate Limiter, Load Balancer |
+| `backend` | `5000` | *None* | 3 | API Express.js (Round-Robin via Nginx) |
+| `db` | `5432` | *None* | 1 | PostgreSQL 16 (Persistensi via Named Volume) |
+
+---
+
+## 6. Perintah Operasional
+
+```bash
+# Menjalankan seluruh stack (Nginx, 3 Backend Replicas, DB)
+docker compose up --build -d
+
+# Memeriksa status kontainer
+docker compose ps
+
+# Memeriksa log Nginx
+docker compose logs -f nginx
+
+# Memeriksa log replika backend
+docker compose logs -f backend
+
+# Menghentikan stack
+docker compose down
+
+# Menghentikan stack sekaligus menghapus volume data database
+docker compose down -v
+```
+
+---
+
+## 7. Atribusi Alat Bantu & Referensi
+
+* **AI Assistance**: Claude & Google DeepMind Antigravity AI digunakan untuk perancangan arsitektur ingress Nginx, konfigurasi Compose multi-replica, implementasi rate limiting HTTP 429, dan penyusunan dokumentasi teknis.
+* **Referensi Resmi**:
+  * [Nginx Reverse Proxy Documentation](https://nginx.org/en/docs/http/ngx_http_proxy_module.html)
+  * [Nginx Upstream Shared Memory Zone](https://nginx.org/en/docs/http/ngx_http_upstream_module.html#zone)
+  * [Nginx Rate Limiting Module](https://nginx.org/en/docs/http/ngx_http_limit_req_module.html)
+  * [RFC 6585: Additional HTTP Status Codes (429 Too Many Requests)](https://datatracker.ietf.org/doc/html/rfc6585#section-4)

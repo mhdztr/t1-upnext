@@ -1,4 +1,4 @@
-# UpNext Backend — Nginx Gateway, Load Balancing & Traffic Security
+# UpNext Backend, Nginx Gateway, Load Balancing & Traffic Security
 
 **Tugas 2 — Study Club Backend Intermediate**  
 Kabinet Genesis | KSM Veterantech UPNVJ 2026  

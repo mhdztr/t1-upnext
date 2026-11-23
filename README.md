@@ -1,8 +1,25 @@
 # UpNext Backend, Nginx Gateway, Load Balancing & Traffic Security
 
+![Docker Compose](https://img.shields.io/badge/stack-Docker%20Compose-2496ED?logo=docker&logoColor=white)
+![License: MIT](https://img.shields.io/github/license/mhdztr/t1-upnext)
+![Scope: assignment](https://img.shields.io/badge/scope-assignment-blue)
+
 **Tugas 2 — Study Club Backend Intermediate**  
 Kabinet Genesis | KSM Veterantech UPNVJ 2026  
 Repository: [mhdztr/t1-upnext](https://github.com/mhdztr/t1-upnext)
+
+> **Status:** repositori artefak tugas (study club). Kode disediakan apa adanya untuk keperluan pembelajaran; lihat [Lisensi](#lisensi).
+
+## Daftar Isi
+
+- [1. Overview](#1-overview)
+- [2. Cara Menjalankan](#2-cara-menjalankan)
+- [3. Bukti Pengujian cURL](#3-bukti-pengujian-curl)
+- [4. Jawaban Pertanyaan Konseptual](#4-jawaban-pertanyaan-konseptual)
+- [5. Pemetaan Service dan Konfigurasi](#5-pemetaan-service-dan-konfigurasi)
+- [6. Perintah Operasional](#6-perintah-operasional)
+- [7. Atribusi Alat Bantu & Referensi](#7-atribusi-alat-bantu--referensi)
+- [Lisensi](#lisensi)
 
 ---
 
@@ -179,3 +196,9 @@ docker compose down -v
   * [Nginx Upstream Shared Memory Zone](https://nginx.org/en/docs/http/ngx_http_upstream_module.html#zone)
   * [Nginx Rate Limiting Module](https://nginx.org/en/docs/http/ngx_http_limit_req_module.html)
   * [RFC 6585: Additional HTTP Status Codes (429 Too Many Requests)](https://datatracker.ietf.org/doc/html/rfc6585#section-4)
+
+---
+
+## Lisensi
+
+Repositori ini menggunakan lisensi MIT. Lihat [LICENSE](LICENSE). Kode ini dibagikan untuk keperluan pembelajaran dan disediakan apa adanya, tanpa jaminan atau dukungan produksi.
